@@ -59,3 +59,4 @@ _Pvt_Extensions
 _ReSharper*/
 _TeamCity*
 _UpgradeReport_Files/
+!example.log

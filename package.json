@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Actor Model task queue",
   "main": "dist/index.js",
+  "types": "dist/typings/index.d.js",
   "scripts": {
     "build": "(npm test && bash scripts/build.sh) || exit 15",
     "deploy:local": "cp package.json ./docker/package.json; npm run build && npm run docker:build",
@@ -26,8 +27,6 @@
     "@babel/core": "7.19.6",
     "@babel/plugin-transform-typescript": "7.20.0",
     "@rushstack/eslint-config": "3.1.1",
-    "@rushstack/heft": "0.48.7",
-    "@rushstack/heft-jest-plugin": "0.3.44",
     "@types/chai": "4.3.3",
     "@types/eslint-config-prettier": "6.11.0",
     "@types/eslint-plugin-prettier": "3.1.0",

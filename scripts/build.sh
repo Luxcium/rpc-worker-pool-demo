@@ -1,3 +1,3 @@
 #!/bin/sh
 
-tsc --noEmit false --generateCpuProfile ./out/performance.cpuprofile || exit 11
+tsc --noEmit false --generateCpuProfile ./docker/out/performance.cpuprofile || exit 11
