@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Actor Model task queue",
   "main": "dist/index.js",
-  "types": "dist/typings/index.d.ts",
   "scripts": {
     "build": "(npm test && bash scripts/build.sh) || exit 15",
     "deploy:local": "cp package.json ./docker/package.json; npm run build && npm run docker:build",

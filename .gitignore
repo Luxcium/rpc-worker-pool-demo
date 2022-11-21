@@ -26,6 +26,8 @@ downloads
 /obj
 /out
 /targetSelection
+/docker/dist
+/docker/out
 
 ## FILES
 *.zwc

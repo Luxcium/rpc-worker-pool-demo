@@ -1575,14 +1575,8 @@
       "pwsh": null,
     },
     "conventionalCommits.scopes": [
-      "backend",
+      "rpc-worker-pool",
       "common",
-      "frontend",
-      "library",
-      "tools",
-      "private",
-      "RushStack",
-      "services",
       "examples"
     ],
     "workbench.colorCustomizations": {
