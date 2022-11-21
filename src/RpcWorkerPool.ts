@@ -4,92 +4,123 @@ import { Worker } from 'worker_threads';
 
 const VERBOSE = false;
 const CORES = cpus().length;
-
-const STRATEGIES = new Set(['roundrobin', 'random', 'leastbusy']);
+// type Strategies = 'roundrobin' | 'random' | 'leastbusy';
+const STRATEGIES = new Set<string>(['roundrobin', 'random', 'leastbusy']);
 export class RpcWorkerPool {
-  /**
-   * The size of the worker pool
-   * @member {number}
-   */
-  constructor(path, size = 0, strategy = 'roundrobin') {
-    if (size === 0) this.size = CORES; // <1>
-    else if (size < 0) this.size = Math.max(CORES + size, 1);
-    else this.size = size;
+  private size: number;
+  private strategy: string;
+  private versosity: boolean;
+  private rr_index: number;
+  private next_job_id: number;
+  private workers: {
+    worker: Worker;
+    in_flight_commands: Map<number, any>;
+    worker_id: number;
+  }[];
+  constructor(
+    path: string,
+    size: number = 0,
+    strategy: string = 'leastbusy',
+    versosity = VERBOSE
+  ) {
+    this.size = size < 0 ? Math.max(CORES + size, 1) : size || CORES;
+    this.strategy = STRATEGIES.has(strategy) ? strategy : 'leastbusy';
+    this.versosity = versosity;
 
-    if (!STRATEGIES.has(strategy)) throw new TypeError('invalid strategy');
-    this.strategy = strategy; // <2>
     this.rr_index = -1;
-
-    this.next_command_id = 0;
-    this.workers = []; // <3>
-
-    for (let i = 0; i < this.size; i++) {
+    this.next_job_id = 0;
+    this.workers = [];
+    for (let worker_id = 0; worker_id < this.size; worker_id++) {
       const worker = new Worker(path);
-      this.workers.push({ worker, in_flight_commands: new Map() }); // <4>
+      this.workers.push({ worker, in_flight_commands: new Map(), worker_id });
       worker.on('message', msg => {
-        this.onMessageHandler(msg, i);
+        this.onMessageHandler(msg, worker_id);
       });
     }
   }
-  // ++ ----------------------------------------------------------------
-  onMessageHandler(msg, worker_id) {
+  // ++ --------------------------------------------------------------
+  onMessageHandler(msg: any, worker_id: number) {
     const worker = this.workers[worker_id];
+
     const { result, error, job_id } = msg;
+
+    // resolve: (value: any) => void, reject: (reason?: any) =>
     const { resolve, reject } = worker.in_flight_commands.get(job_id);
     worker.in_flight_commands.delete(job_id);
+
     if (error) reject(error);
     else resolve(result);
   }
-  // ++ ----------------------------------------------------------------
-  /**
-   * @param {string} method - The first input number
-   */
-  async exec(method, message_id, ...args) {
-    const job_id = ++this.next_command_id;
-    let resolve, reject;
-    const promise = new Promise((res, rej) => {
-      resolve = res;
-      reject = rej;
+  // ++ --------------------------------------------------------------
+
+  async exec(command_name: string, message_id: number, ...args: string[]) {
+    const job_id = this.next_job_id++;
+
+    // The message_id is provided for feedback purpose only.
+    const worker = this.getWorker(message_id);
+
+    const promise = new Promise((resolve, reject) => {
+      worker.in_flight_commands.set(job_id, { resolve, reject });
     });
-    const worker = this.getWorker(message_id); // <1>
-    worker.in_flight_commands.set(job_id, { resolve, reject });
-    worker.worker.postMessage({ method, params: args, job_id });
+    worker.worker.postMessage({ command_name, params: args, job_id });
 
     return promise;
   }
-  // ++ ----------------------------------------------------------------
+  // ++ --------------------------------------------------------------
   getWorker(message_id = -1) {
-    let id;
-    if (this.strategy === 'random') {
-      id = Math.floor(Math.random() * this.size);
-    } else if (this.strategy === 'roundrobin') {
-      this.rr_index++;
-      if (this.rr_index >= this.size) this.rr_index = 0;
-      id = this.rr_index;
-    } else if (this.strategy === 'leastbusy') {
-      let min = Infinity;
-      for (let i = 0; i < this.size; i++) {
-        let worker = this.workers[i];
-        if (worker.in_flight_commands.size < min) {
-          min = worker.in_flight_commands.size;
-          id = i;
+    let worker_id: number = 0;
+    switch (this.strategy) {
+      case 'random':
+        worker_id = Math.floor(Math.random() * this.size);
+        break;
+      case 'roundrobin':
+        this.rr_index++;
+        if (this.rr_index >= this.size) this.rr_index = 0;
+        worker_id = this.rr_index;
+        break;
+      case 'leastbusy':
+      default:
+        let min = Infinity;
+        for (let i = 0; i < this.size; i++) {
+          let worker = this.workers[i];
+          if (worker.in_flight_commands.size < min) {
+            min = worker.in_flight_commands.size;
+            worker_id = 0;
+          }
         }
-      }
     }
 
-    console.log(
-      'Selected Worker:',
-      id + 1,
-      'for message id:',
-      message_id || 0,
-      '\n\n'
-    );
-    return this.workers[id];
+    this.versosity &&
+      console.log(
+        `\n\nWorker: ${worker_id + 1} Message id: ${message_id || 0}\n`
+      );
+
+    return this.workers[worker_id];
   }
 }
 
 export default RpcWorkerPool;
 
+/**
+ * The size of the worker pool
+ * @member @type {number}
+ */
+/**
+ * The strategie to determine the worker to be to execude the next
+ * command.
+ * @member @type {Strategies}
+ */
+/**
+ * Determines the verbosity of certain informations to log.
+ * @member @type {boolean}
+ */
+/**
+ * @param {string} method_name - The name of the method listed in
+ * the available commands.
+ * @param {number} message_id - The sequential number generated by
+ * the server, identifies which message will be linked with the
+ * curent job being executed. (For feedback purpose only).
+ */
 /* **************************************************************** */
 /*                                                                  */
 /*  MIT LICENSE                                                     */

@@ -2,45 +2,36 @@
 // #!! Consumed by the RpcWorkerPool class via path to file.
 
 import { parentPort } from 'node:worker_threads';
-
-const commands: { [k: string]: any } = {
-  ['hello-world'](...args: any[]) {
-    console.log(
-      'Hello wold will echo back:',
-      decodeURIComponent(...(args as [any]))
-    );
-    return {
-      ['hello-world']: 'Hello wold just echo back!',
-      args: decodeURIComponent(...(args as [any])),
-    };
-  },
-};
+import { commands } from './commands';
 
 try {
   if (!parentPort) throw new Error('parentPort is missing or is undefined');
   void parentPort.on(
     'message',
-    asyncOnMessageWrap(async ({ method, params, job_id }: MsgObjectToWrap) => {
-      const messageRPC: MessageRPC = {
-        jsonrpc: '2.0',
-        job_id,
-        pid: 'worker: ' + process.pid,
-      };
-      try {
-        const resultRPC = await commands[method](...params);
-        return { ...messageRPC, result: resultRPC };
-      } catch (error: any) {
-        const errorRPC = {
-          code: -32_603,
-          message:
-            'Internal error!!! (Internal JSON-RPC error). ' +
-            (error.message || ''),
-          data: error,
+    asyncOnMessageWrap(
+      async ({ command_name, params, job_id }: MsgObjectToWrap) => {
+        const messageRPC: MessageRPC = {
+          jsonrpc: '2.0',
+          job_id,
+          pid: 'worker: ' + process.pid,
         };
-        console.error(String({ ...messageRPC, error: errorRPC }));
-        return { ...messageRPC, error: errorRPC };
+
+        try {
+          const resultRPC = await commands[command_name](...params);
+          return { ...messageRPC, result: resultRPC };
+        } catch (error: any) {
+          const errorRPC = {
+            code: -32_603,
+            message:
+              'Internal error!!! (Internal JSON-RPC error). ' +
+              (error.message || ''),
+            error,
+          };
+          console.error(String({ ...messageRPC, error: errorRPC }));
+          return { ...messageRPC, error: errorRPC };
+        }
       }
-    })
+    )
   );
 } catch (error) {
   void console.error('Error communicating with parentPort:', error);
@@ -59,7 +50,7 @@ function asyncOnMessageWrap(fn: WraperFunction) {
     }
   };
 }
-type MsgObjectToWrap = { method: string; params: string; job_id: string };
+type MsgObjectToWrap = { command_name: string; params: string; job_id: string };
 type WraperFunction = (msgObject: MsgObjectToWrap) => Promise<any>;
 
 type MessageRPC = {
